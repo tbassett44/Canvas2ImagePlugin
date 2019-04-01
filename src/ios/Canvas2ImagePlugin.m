@@ -4,8 +4,9 @@
 //
 //  Created by Tommy-Carlos Williams on 29/03/12.
 //  Copyright (c) 2012 Tommy-Carlos Williams. All rights reserved.
-//	MIT Licensed
+//  MIT Licensed
 //
+//Updated to return file path in success callback
 
 #import "Canvas2ImagePlugin.h"
 #import <Cordova/CDV.h>
@@ -22,35 +23,32 @@
 - (void)saveImageDataToLibrary:(CDVInvokedUrlCommand*)command
 {
     self.callbackId = command.callbackId;
-	NSData* imageData = [[NSData alloc] initWithBase64EncodedString:[command.arguments objectAtIndex:0] options:0];
-	
-	UIImage* image = [[[UIImage alloc] initWithData:imageData] autorelease];	
-	UIImageWriteToSavedPhotosAlbum(image, self, @selector(image:didFinishSavingWithError:contextInfo:), nil);
-	
-}
+    NSData* imageData = [NSData dataFromBase64String:[command.arguments objectAtIndex:0]];
+    
+    UIImage* image = [[[UIImage alloc] initWithData:imageData] autorelease];
+    ALAssetsLibrary *library = [[ALAssetsLibrary alloc] init];
 
-- (void)image:(UIImage *)image didFinishSavingWithError:(NSError *)error contextInfo:(void *)contextInfo
-{
-    // Was there an error?
-    if (error != NULL)
-    {
-        // Show error message...
-        NSLog(@"ERROR: %@",error);
-		CDVPluginResult* result = [CDVPluginResult resultWithStatus: CDVCommandStatus_ERROR messageAsString:error.description];
-		[self.commandDelegate sendPluginResult:result callbackId:self.callbackId];
-    }
-    else  // No errors
-    {
-        // Show message image successfully saved
-        NSLog(@"IMAGE SAVED!");
-		CDVPluginResult* result = [CDVPluginResult resultWithStatus: CDVCommandStatus_OK messageAsString:@"Image saved"];
-		[self.commandDelegate sendPluginResult:result callbackId:self.callbackId];
-    }
+    [library writeImageToSavedPhotosAlbum: image.CGImage metadata:nil completionBlock:^(NSURL *assetURL, NSError *error){
+        if (error)
+        {  
+            // Show error message...
+            NSLog(@"ERROR: %@",error);
+            CDVPluginResult* result = [CDVPluginResult resultWithStatus: CDVCommandStatus_ERROR messageAsString:error.description];
+            [self.webView stringByEvaluatingJavaScriptFromString:[result toErrorCallbackString: self.callbackId]];
+        }
+        else
+        {  
+            // Show message image successfully saved
+            NSLog(@"Saved URL : %@", assetURL);
+            CDVPluginResult* result = [CDVPluginResult resultWithStatus: CDVCommandStatus_OK messageAsString:[assetURL absoluteString]];
+            [self.webView stringByEvaluatingJavaScriptFromString:[result toSuccessCallbackString: self.callbackId]];
+        }  
+}];  
+[library release];  
 }
-
 - (void)dealloc
-{	
-	[callbackId release];
+{   
+    [callbackId release];
     [super dealloc];
 }
 
